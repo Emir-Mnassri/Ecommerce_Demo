@@ -5,10 +5,12 @@ import productsRouter from "./products";
 import ordersRouter from "./orders";
 import paymentRouter from "./payment";
 import adminRouter from "./admin";
+import verifyRouter from "./verify";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(verifyRouter);
 router.use(categoriesRouter);
 router.use(productsRouter);
 router.use(ordersRouter);

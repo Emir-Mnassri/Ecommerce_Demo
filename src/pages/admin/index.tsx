@@ -70,7 +70,7 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
     e.preventDefault();
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${import.meta.env.BASE_URL?.replace(/\/$/, "") ?? ""}/api/admin/stats`, {
+      const res = await fetch(`/api/admin/verify`, {
         headers: { Authorization: `Bearer ${password}` },
       });
       if (res.ok) { localStorage.setItem(STORAGE_KEY, password); onLogin(password); }
