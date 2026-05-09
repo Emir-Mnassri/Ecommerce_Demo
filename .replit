@@ -50,6 +50,10 @@ waitForPort = 3000
 localPort = 3000
 externalPort = 3000
 
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "PORT=3000 node --enable-source-maps artifacts/api-server/dist/index.mjs & PORT=5000 BASE_PATH=/ node --enable-source-maps artifacts/storefront/node_modules/.bin/vite preview --config artifacts/storefront/vite.config.ts --host 0.0.0.0"]
