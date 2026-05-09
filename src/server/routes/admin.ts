@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, ordersTable, productsTable, categoriesTable } from "../../db/index";
 import { eq, desc, count, sum, sql } from "drizzle-orm";
 import { z } from "zod";
-import { adminAuth, requireAdmin } from "../middlewares/auth";
+import { adminAuth, requireAdmin, requireAdminOrSales, requireAdminOrInventory } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -93,7 +93,7 @@ router.get("/admin/stats", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/admin/orders", async (req, res): Promise<void> => {
+router.get("/admin/orders", requireAdminOrSales, async (req, res): Promise<void> => {
   try {
     const orders = await db
       .select()
@@ -108,7 +108,7 @@ router.get("/admin/orders", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/admin/products", requireAdmin, async (req, res): Promise<void> => {
+router.get("/admin/products", requireAdminOrInventory, async (req, res): Promise<void> => {
   try {
     const rows = await db
       .select({
@@ -244,7 +244,7 @@ router.put("/admin/products/:id", requireAdmin, async (req, res): Promise<void> 
 
 const StockPatchBody = z.object({ delta: z.number().int() });
 
-router.patch("/admin/products/:id/stock", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/admin/products/:id/stock", requireAdminOrInventory, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "ID invalide" });
@@ -299,7 +299,7 @@ const UpdateOrderStatusBody = z.object({
   status: z.enum(["pending", "awaiting_payment", "paid", "shipped", "delivered", "cancelled"]),
 });
 
-router.put("/admin/orders/:id/status", async (req, res): Promise<void> => {
+router.put("/admin/orders/:id/status", requireAdminOrSales, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "ID invalide" });

@@ -34,6 +34,20 @@ import { formatPrice } from "@/lib/format";
 
 const STORAGE_KEY = "mm_admin_token";
 
+type Role = "admin" | "sales" | "inventory";
+
+function roleFromToken(token: string): Role {
+  if (token === "sales") return "sales";
+  if (token === "inventory") return "inventory";
+  return "admin";
+}
+
+const ROLE_LABELS: Record<Role, { label: string; color: string }> = {
+  admin:     { label: "Administrateur", color: "bg-primary text-primary-foreground" },
+  sales:     { label: "Commercial",     color: "bg-blue-600 text-white" },
+  inventory: { label: "Inventaire",     color: "bg-amber-600 text-white" },
+};
+
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending:          { label: "En attente",       variant: "secondary" },
   awaiting_payment: { label: "Paiement attendu", variant: "outline" },
@@ -73,7 +87,7 @@ function LoginScreen({ onLogin }: { onLogin: (t: string) => void }) {
         <div className="border border-border p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Mot de passe admin</label>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Mot de passe</label>
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 className="rounded-none h-12" placeholder="••••••••" autoFocus />
             </div>
@@ -123,7 +137,6 @@ function ProductFormDialog({
   const [form, setForm] = useState<typeof EMPTY_FORM>(EMPTY_FORM);
   const [error, setError] = useState("");
 
-  // Populate form when editing
   const prevOpen = open;
   if (prevOpen && !form.name && editProduct) {
     setForm({
@@ -160,7 +173,6 @@ function ProductFormDialog({
     }
   }, [editProduct]);
 
-  // Reset on open
   useState(() => { if (open) handleOpen(); });
 
   const saveMutation = useMutation({
@@ -201,87 +213,59 @@ function ProductFormDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
-          {/* Name */}
           <div className="sm:col-span-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Nom du produit *</Label>
             <Input className="rounded-none mt-1" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Vase en céramique de Nabeul" />
           </div>
-
-          {/* SKU */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">SKU</Label>
             <Input className="rounded-none mt-1" value={form.sku ?? ""} onChange={(e) => set("sku", e.target.value)} placeholder="Ex: VAS-001" />
           </div>
-
-          {/* Category */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Catégorie</Label>
-            <Select
-              value={form.categoryId?.toString() ?? "none"}
-              onValueChange={(v) => set("categoryId", v === "none" ? null : parseInt(v))}
-            >
-              <SelectTrigger className="rounded-none mt-1">
-                <SelectValue placeholder="Aucune catégorie" />
-              </SelectTrigger>
+            <Select value={form.categoryId?.toString() ?? "none"} onValueChange={(v) => set("categoryId", v === "none" ? null : parseInt(v))}>
+              <SelectTrigger className="rounded-none mt-1"><SelectValue placeholder="Aucune catégorie" /></SelectTrigger>
               <SelectContent className="rounded-none">
                 <SelectItem value="none">Aucune catégorie</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                ))}
+                {categories.map((c) => (<SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Price */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Prix de base (DT) *</Label>
             <Input className="rounded-none mt-1" type="number" min={0} step="0.001"
               value={form.price} onChange={(e) => set("price", parseFloat(e.target.value) || 0)} />
           </div>
-
-          {/* Discount Price */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Prix promo (DT)</Label>
             <Input className="rounded-none mt-1" type="number" min={0} step="0.001"
               value={form.discountPrice ?? ""} placeholder="Laisser vide si pas de promo"
               onChange={(e) => set("discountPrice", e.target.value ? parseFloat(e.target.value) : null)} />
           </div>
-
-          {/* Stock */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Stock initial</Label>
             <Input className="rounded-none mt-1" type="number" min={0}
               value={form.stock} onChange={(e) => set("stock", parseInt(e.target.value) || 0)} />
           </div>
-
-          {/* Image URL */}
           <div>
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">URL de l'image</Label>
             <Input className="rounded-none mt-1" value={form.imageUrl ?? ""}
               onChange={(e) => set("imageUrl", e.target.value)} placeholder="https://images.unsplash.com/..." />
           </div>
-
-          {/* Description */}
           <div className="sm:col-span-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Description</Label>
             <Textarea className="rounded-none mt-1 resize-none" rows={3}
               value={form.description ?? ""} onChange={(e) => set("description", e.target.value)}
               placeholder="Description du produit..." />
           </div>
-
-          {/* Toggles */}
           <div className="flex items-center gap-3">
-            <Switch id="isOnSale" checked={form.isOnSale ?? false}
-              onCheckedChange={(v) => set("isOnSale", v)} />
+            <Switch id="isOnSale" checked={form.isOnSale ?? false} onCheckedChange={(v) => set("isOnSale", v)} />
             <Label htmlFor="isOnSale" className="text-sm cursor-pointer">En promotion</Label>
           </div>
           <div className="flex items-center gap-3">
-            <Switch id="featured" checked={form.featured ?? false}
-              onCheckedChange={(v) => set("featured", v)} />
+            <Switch id="featured" checked={form.featured ?? false} onCheckedChange={(v) => set("featured", v)} />
             <Label htmlFor="featured" className="text-sm cursor-pointer">Produit vedette</Label>
           </div>
-
-          {/* Image preview */}
           {form.imageUrl && (
             <div className="sm:col-span-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground block mb-2">Aperçu</Label>
@@ -307,7 +291,7 @@ function ProductFormDialog({
 }
 
 // ─── Products Table ─────────────────────────────────────────────────────────────
-function ProductsTable({ token }: { token: string }) {
+function ProductsTable({ token, role }: { token: string; role: Role }) {
   const qc = useQueryClient();
   const { data: products = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-products", token],
@@ -331,6 +315,7 @@ function ProductsTable({ token }: { token: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-products", token] }),
   });
 
+  const canEdit = role === "admin";
   const openAdd = () => { setEditTarget(null); setDialogOpen(true); };
   const openEdit = (p: AdminProduct) => { setEditTarget(p); setDialogOpen(true); };
 
@@ -338,12 +323,14 @@ function ProductsTable({ token }: { token: string }) {
 
   return (
     <>
-      <ProductFormDialog
-        open={dialogOpen}
-        onClose={() => { setDialogOpen(false); setEditTarget(null); }}
-        token={token}
-        editProduct={editTarget}
-      />
+      {canEdit && (
+        <ProductFormDialog
+          open={dialogOpen}
+          onClose={() => { setDialogOpen(false); setEditTarget(null); }}
+          token={token}
+          editProduct={editTarget}
+        />
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted-foreground">{products.length} produit(s)</p>
@@ -351,11 +338,19 @@ function ProductsTable({ token }: { token: string }) {
           <Button variant="outline" size="sm" className="rounded-none" onClick={() => refetch()}>
             <RefreshCw className="w-3 h-3 mr-2" />Actualiser
           </Button>
-          <Button size="sm" className="rounded-none" onClick={openAdd}>
-            <PlusCircle className="w-3 h-3 mr-2" />Ajouter un produit
-          </Button>
+          {canEdit && (
+            <Button size="sm" className="rounded-none" onClick={openAdd}>
+              <PlusCircle className="w-3 h-3 mr-2" />Ajouter un produit
+            </Button>
+          )}
         </div>
       </div>
+
+      {role === "inventory" && (
+        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-none">
+          Mode inventaire — vous pouvez ajuster les stocks uniquement.
+        </div>
+      )}
 
       <div className="border border-border rounded-none overflow-hidden">
         <Table>
@@ -366,7 +361,7 @@ function ProductsTable({ token }: { token: string }) {
               <TableHead className="text-xs uppercase tracking-wider">Prix</TableHead>
               <TableHead className="text-xs uppercase tracking-wider text-center">Stock</TableHead>
               <TableHead className="text-xs uppercase tracking-wider">Statut</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider text-right">Actions</TableHead>
+              {canEdit && <TableHead className="text-xs uppercase tracking-wider text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -435,20 +430,22 @@ function ProductsTable({ token }: { token: string }) {
                     </div>
                   </TableCell>
 
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => openEdit(p)}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="ghost" size="icon"
-                        className="h-8 w-8 rounded-none text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => { if (confirm(`Supprimer "${p.name}" ?`)) deleteMutation.mutate(p.id); }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canEdit && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => openEdit(p)}>
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          className="h-8 w-8 rounded-none text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => { if (confirm(`Supprimer "${p.name}" ?`)) deleteMutation.mutate(p.id); }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}
@@ -458,9 +455,11 @@ function ProductsTable({ token }: { token: string }) {
           <div className="py-16 text-center">
             <Package className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">Aucun produit pour le moment</p>
-            <Button size="sm" className="rounded-none mt-4" onClick={openAdd}>
-              <PlusCircle className="w-3 h-3 mr-2" />Créer le premier produit
-            </Button>
+            {canEdit && (
+              <Button size="sm" className="rounded-none mt-4" onClick={openAdd}>
+                <PlusCircle className="w-3 h-3 mr-2" />Créer le premier produit
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -546,6 +545,15 @@ function OrdersTable({ token }: { token: string }) {
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const role = roleFromToken(token);
+  const roleInfo = ROLE_LABELS[role];
+
+  const canSeeOrders   = role === "admin" || role === "sales";
+  const canSeeProducts = role === "admin" || role === "inventory";
+  const canSeeStats    = role === "admin" || role === "sales";
+
+  const defaultTab = canSeeProducts ? "products" : "orders";
+
   const { data: stats, isLoading, isError } = useQuery({
     queryKey: ["admin-stats", token],
     queryFn: () => fetchAdminStats(token),
@@ -558,10 +566,15 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     <div className="min-h-screen bg-background">
       <header className="border-b border-border sticky top-0 z-10 bg-background/90 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
-          <h1 className="font-serif font-bold text-lg">
-            Maison <span className="text-primary">Marsa</span>
-            <span className="text-muted-foreground font-sans font-normal text-sm ml-2">Admin</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif font-bold text-lg">
+              Maison <span className="text-primary">Marsa</span>
+              <span className="text-muted-foreground font-sans font-normal text-sm ml-2">Admin</span>
+            </h1>
+            <span className={`hidden sm:inline-flex text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 ${roleInfo.color}`}>
+              {roleInfo.label}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
               Voir la boutique
@@ -575,38 +588,48 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        {/* Stat Cards */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {[1,2,3,4].map(i => <div key={i} className="h-28 bg-muted/30 animate-pulse border border-border" />)}
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard title="Total Commandes" value={stats.totalOrders.toLocaleString("fr-TN")} icon={ShoppingBag} sub="Toutes les commandes" />
-            <StatCard title="Chiffre d'Affaires" value={formatPrice(stats.totalRevenue)} icon={TrendingUp} sub="Revenus cumulés" />
-            <StatCard title="En Attente" value={stats.pendingOrders.toLocaleString("fr-TN")} icon={Clock} sub="À traiter" />
-            <StatCard title="Produits" value={stats.totalProducts.toLocaleString("fr-TN")} icon={Package} sub="Dans le catalogue" />
-          </div>
-        ) : null}
+
+        {/* Stat Cards — admin and sales only */}
+        {canSeeStats && (
+          isLoading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {[1,2,3,4].map(i => <div key={i} className="h-28 bg-muted/30 animate-pulse border border-border" />)}
+            </div>
+          ) : stats ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <StatCard title="Total Commandes" value={stats.totalOrders.toLocaleString("fr-TN")} icon={ShoppingBag} sub="Toutes les commandes" />
+              <StatCard title="Chiffre d'Affaires" value={formatPrice(stats.totalRevenue)} icon={TrendingUp} sub="Revenus cumulés" />
+              <StatCard title="En Attente" value={stats.pendingOrders.toLocaleString("fr-TN")} icon={Clock} sub="À traiter" />
+              <StatCard title="Produits" value={stats.totalProducts.toLocaleString("fr-TN")} icon={Package} sub="Dans le catalogue" />
+            </div>
+          ) : null
+        )}
 
         {/* Tabs */}
-        <Tabs defaultValue="products">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="rounded-none mb-6 bg-muted/40 border border-border h-auto p-1">
-            <TabsTrigger value="products" className="rounded-none data-[state=active]:bg-background">
-              <Package className="w-3 h-3 mr-2" />Produits &amp; Stock
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="rounded-none data-[state=active]:bg-background">
-              <ShoppingBag className="w-3 h-3 mr-2" />Commandes
-            </TabsTrigger>
+            {canSeeProducts && (
+              <TabsTrigger value="products" className="rounded-none data-[state=active]:bg-background">
+                <Package className="w-3 h-3 mr-2" />Produits &amp; Stock
+              </TabsTrigger>
+            )}
+            {canSeeOrders && (
+              <TabsTrigger value="orders" className="rounded-none data-[state=active]:bg-background">
+                <ShoppingBag className="w-3 h-3 mr-2" />Commandes
+              </TabsTrigger>
+            )}
           </TabsList>
 
-          <TabsContent value="products">
-            <ProductsTable token={token} />
-          </TabsContent>
-
-          <TabsContent value="orders">
-            <OrdersTable token={token} />
-          </TabsContent>
+          {canSeeProducts && (
+            <TabsContent value="products">
+              <ProductsTable token={token} role={role} />
+            </TabsContent>
+          )}
+          {canSeeOrders && (
+            <TabsContent value="orders">
+              <OrdersTable token={token} />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
