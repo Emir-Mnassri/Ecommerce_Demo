@@ -1,12 +1,16 @@
 import { defineConfig } from "drizzle-kit";
-import path from "path";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export default defineConfig({
-  schema: path.join(import.meta.dirname, "./src/db/schema/index.ts"),
+  schema: join(__dirname, "./src/db/schema/index.ts"),
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
