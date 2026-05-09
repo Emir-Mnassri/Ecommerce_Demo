@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import {
   ShoppingBag, TrendingUp, Clock, Package,
-  LogOut, Download, RefreshCw, Pencil, Trash2, Plus, Minus, PlusCircle,
+  LogOut, Download, RefreshCw, Pencil, Trash2, Plus, Minus, PlusCircle, Bell,
 } from "lucide-react";
 import {
   fetchAdminStats, fetchAdminOrders, fetchAdminProducts,
@@ -32,7 +33,8 @@ import { useListCategories } from "@/lib/api-client";
 import { generateReceipt } from "@/lib/generate-receipt";
 import { formatPrice } from "@/lib/format";
 
-const STORAGE_KEY = "mm_admin_token";
+const STORAGE_KEY      = "mm_admin_token";
+const LAST_SEEN_KEY    = "mm_last_seen_order_id";
 
 type Role = "admin" | "sales" | "inventory";
 
@@ -554,11 +556,58 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   const defaultTab = canSeeProducts ? "products" : "orders";
 
+  // ── New-order notification state ──────────────────────────────────────────
+  const [lastSeenOrderId, setLastSeenOrderId] = useState<number>(
+    () => parseInt(localStorage.getItem(LAST_SEEN_KEY) ?? "0", 10),
+  );
+  // Track whether this is the very first poll (skip toast on mount)
+  const isFirstPoll = useRef(true);
+
+  const markOrdersSeen = useCallback((orders: { id: number }[]) => {
+    if (!orders.length) return;
+    const maxId = Math.max(...orders.map((o) => o.id));
+    setLastSeenOrderId(maxId);
+    localStorage.setItem(LAST_SEEN_KEY, String(maxId));
+  }, []);
+
+  // ── Stats query (polls every 20 s) ────────────────────────────────────────
   const { data: stats, isLoading, isError } = useQuery({
     queryKey: ["admin-stats", token],
     queryFn: () => fetchAdminStats(token),
-    refetchInterval: 30_000,
+    refetchInterval: 20_000,
   });
+
+  // ── Detect new orders on each poll ────────────────────────────────────────
+  useEffect(() => {
+    if (!canSeeOrders || !stats?.recentOrders?.length) return;
+
+    const maxIncoming = Math.max(...stats.recentOrders.map((o) => o.id));
+
+    if (isFirstPoll.current) {
+      // First load — just record current max, no toast
+      isFirstPoll.current = false;
+      if (lastSeenOrderId === 0) {
+        setLastSeenOrderId(maxIncoming);
+        localStorage.setItem(LAST_SEEN_KEY, String(maxIncoming));
+      }
+      return;
+    }
+
+    const newCount = stats.recentOrders.filter((o) => o.id > lastSeenOrderId).length;
+    if (newCount > 0) {
+      toast(`🛒 ${newCount} nouvelle${newCount > 1 ? "s" : ""} commande${newCount > 1 ? "s" : ""}`, {
+        description: `${stats.recentOrders.find((o) => o.id > lastSeenOrderId)?.customerName ?? ""} — vérifiez l'onglet Commandes`,
+        duration: 6000,
+        action: { label: "Voir", onClick: () => {} },
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats?.recentOrders]);
+
+  // ── Badge count ───────────────────────────────────────────────────────────
+  const newOrderCount = canSeeOrders && stats?.recentOrders
+    ? stats.recentOrders.filter((o) => o.id > lastSeenOrderId).length
+    : 0;
 
   if (isError) { onLogout(); return null; }
 
@@ -576,6 +625,15 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {/* Bell icon in header when there are unseen orders */}
+            {newOrderCount > 0 && (
+              <div className="relative hidden sm:flex items-center">
+                <Bell className="w-4 h-4 text-primary animate-pulse" />
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                  {newOrderCount > 9 ? "9+" : newOrderCount}
+                </span>
+              </div>
+            )}
             <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
               Voir la boutique
             </a>
@@ -614,8 +672,17 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
               </TabsTrigger>
             )}
             {canSeeOrders && (
-              <TabsTrigger value="orders" className="rounded-none data-[state=active]:bg-background">
+              <TabsTrigger
+                value="orders"
+                className="rounded-none data-[state=active]:bg-background relative"
+                onClick={() => stats?.recentOrders && markOrdersSeen(stats.recentOrders)}
+              >
                 <ShoppingBag className="w-3 h-3 mr-2" />Commandes
+                {newOrderCount > 0 && (
+                  <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                    {newOrderCount > 9 ? "9+" : newOrderCount}
+                  </span>
+                )}
               </TabsTrigger>
             )}
           </TabsList>
