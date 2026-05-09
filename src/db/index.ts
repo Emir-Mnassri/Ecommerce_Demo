@@ -6,7 +6,7 @@ const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL must be set. Configure your Supabase connection string.",
+    "DATABASE_URL must be set. Configure your PostgreSQL connection string.",
   );
 }
 
