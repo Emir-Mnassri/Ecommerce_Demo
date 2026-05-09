@@ -15,15 +15,25 @@ function getBearer(req: Request): string | null {
 }
 
 export function adminAuth(req: Request, res: Response, next: NextFunction): void {
+  const ADMIN_SECRET     = process.env.ADMIN_SECRET;
+  const SALES_SECRET     = process.env.SALES_SECRET;
+  const INVENTORY_SECRET = process.env.INVENTORY_SECRET;
+
   const token = getBearer(req);
   if (!token) {
     res.status(401).json({ error: "Non autorisé" });
     return;
   }
 
-  if (token === "admin") { req.userRole = "admin"; next(); return; }
-  if (token === "sales") { req.userRole = "sales"; next(); return; }
-  if (token === "inventory") { req.userRole = "inventory"; next(); return; }
+  if (ADMIN_SECRET && token === ADMIN_SECRET) {
+    req.userRole = "admin"; next(); return;
+  }
+  if (SALES_SECRET && token === SALES_SECRET) {
+    req.userRole = "sales"; next(); return;
+  }
+  if (INVENTORY_SECRET && token === INVENTORY_SECRET) {
+    req.userRole = "inventory"; next(); return;
+  }
 
   res.status(401).json({ error: "Non autorisé" });
 }
